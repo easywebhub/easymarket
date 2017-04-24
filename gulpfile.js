@@ -17,6 +17,13 @@ const $ = {
     concat:       require('gulp-concat')
 };
 
+if (!PROD) {
+    $.sass = require('gulp-sass');
+    $.uglify = require('gulp-uglify');
+    $.cssnano = require('gulp-cssnano');
+    $.babel = require('gulp-babel');
+}
+
 const MetalSmithProductionPlugins = [
     'metalsmith-html-minifier'
 ];
@@ -87,10 +94,18 @@ function script() {
         concatName = site.script.concatName;
     let task = gulp.src(site.script.files)
         .pipe($.plumber());
+    
+    // babel es6 -> es5
+    if (!PROD)
+        task = task.pipe($.babel({presets: ['es2015'], compact: false}));
 
     if (IS_CONCAT)
         task = task.pipe($.concat(concatName));
 
+    if (!PROD)
+        task = task.pipe($.uglify().on('error', e => {
+            console.log(e);
+        }));
     return task.pipe(gulp.dest(`${site.buildRoot}/js`));
 }
 
@@ -123,7 +138,7 @@ function asset() {
 
 // tạo local server host nội dung của ${site.buildRoot}
 function server(done) {
-	if (!browser) browser = require('browser-sync');
+    if (!browser) browser = require('browser-sync');
     browser.init({
         server: site.buildRoot,
         port:   site.port
@@ -132,7 +147,7 @@ function server(done) {
 }
 
 function serverForApp(done) {
-	if (!browser) browser = require('browser-sync');
+    if (!browser) browser = require('browser-sync');
     browser.init({
         server: site.buildRoot,
         ui:     false,
