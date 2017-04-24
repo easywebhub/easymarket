@@ -21,9 +21,6 @@ const site = {
     //menu.json chứa thông tin về menu của website
     //footer.json chứa thông tin về footer của website
     metadataRoot : './content/metadata'
-
-
-
 };
 
 site.script = {
@@ -62,7 +59,7 @@ site.style = {
 // define và config các plugin của metalsmith
 site.metalsmith = {
     'metalsmith-metadata-directory': {
-      'directory': `${site.metadataRoot}/**/*.json`
+      'directory': `${site.metadataRoot}/*.json`
     },
 
     'metalsmith-drafts':        {
