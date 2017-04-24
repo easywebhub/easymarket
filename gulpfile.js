@@ -3,7 +3,7 @@
 const PROD = !!(require('yargs').argv.production);
 let site = require('./site');
 const gulp = require('gulp');
-const browser = require('browser-sync');
+let browser;
 const Metalsmith = require('metalsmith');
 const Handlebars = require('handlebars');
 require('./handlebars-helper')(Handlebars);
@@ -12,12 +12,8 @@ require('./handlebars-helper')(Handlebars);
 const $ = {
     plumber:      require('gulp-plumber'),
     sourcemaps:   require('gulp-sourcemaps'),
-    sass:         require('gulp-sass'),
-    uglify:       require('gulp-uglify'),
-    cssnano:      require('gulp-cssnano'),
     autoprefixer: require('gulp-autoprefixer'),
     inlineSource: require('gulp-inline-source'),
-    babel:        require('gulp-babel'),
     concat:       require('gulp-concat')
 };
 
@@ -79,34 +75,6 @@ function metalsmith(done) {
 }
 
 /**
- * build site's sass file, xử lý autoprefixer
- * tạo source map nếu ở chế độ debug
- * ở chế độ production apply các plugin: uncss, cssnano, autoprefixer
- */
-function sass() {
-    let task = gulp.src(`${site.styleRoot}/**/*.{scss,sass}`)
-        .pipe($.plumber());
-    if (!PROD)
-        task = task.pipe($.sourcemaps.init());
-
-    if (site.style.sass) {
-        let sassConfig = Object.assign({}, site.style.sass);
-        sassConfig.outputStyle = 'expanded';
-        task = task.pipe($.sass(sassConfig).on('error', $.sass.logError));
-        if (site.style.autoprefixer)
-            task = task.pipe($.autoprefixer(site.style.autoprefixer));
-    }
-
-    if (PROD) {
-       task = task.pipe($.cssnano({autoprefixer: false}));
-    } else {
-        task = task.pipe($.sourcemaps.write());
-    }
-    return task.pipe(gulp.dest(`${site.buildRoot}/css`))
-        .pipe(browser.reload({stream: true}));
-}
-
-/**
  * xử lý script của site
  * nếu ở chế độ debug thì tạo source map
  * nếu ở chế độ production thì minify
@@ -119,22 +87,10 @@ function script() {
         concatName = site.script.concatName;
     let task = gulp.src(site.script.files)
         .pipe($.plumber());
-    if (!PROD)
-        task = task.pipe($.sourcemaps.init());
-
-    // babel es6 -> es5
-    task = task.pipe($.babel({presets: ['es2015'], compact: false}));
 
     if (IS_CONCAT)
         task = task.pipe($.concat(concatName));
 
-    if (PROD) {
-        task = task.pipe($.uglify().on('error', e => {
-            console.log(e);
-        }));
-    } else {
-        task = task.pipe($.sourcemaps.write());
-    }
     return task.pipe(gulp.dest(`${site.buildRoot}/js`));
 }
 
@@ -167,6 +123,7 @@ function asset() {
 
 // tạo local server host nội dung của ${site.buildRoot}
 function server(done) {
+	if (!browser) browser = require('browser-sync');
     browser.init({
         server: site.buildRoot,
         port:   site.port
@@ -175,6 +132,7 @@ function server(done) {
 }
 
 function serverForApp(done) {
+	if (!browser) browser = require('browser-sync');
     browser.init({
         server: site.buildRoot,
         ui:     false,
@@ -184,9 +142,9 @@ function serverForApp(done) {
 }
 
 // Xóa ${buildRoot} (metalsmith tự động xóa)
-// build metalsmith, sass, javascript, image
+// build metalsmith, javascript, image
 // copy tất cả qua ${buildRoot}
-gulp.task('build', gulp.series(metalsmith, gulp.parallel(asset, script, sass), inlineSource));
+gulp.task('build', gulp.series(metalsmith, gulp.parallel(asset, script), inlineSource));
 
 function reload(done) {
     browser.reload();
@@ -197,7 +155,6 @@ function watch() {
     gulp.watch(['site.js'], gulp.series(reloadSiteConfig, 'build', reload));
 
     gulp.watch(`${site.assetRoot}/**/*`, gulp.series(asset, reload));      // watch asset
-    gulp.watch(`${site.styleRoot}/**/*.{scss,sass}`, sass);                // watch style
     gulp.watch(`${site.scriptRoot}/**/*.js`, gulp.series(script, reload)); // watch script
     gulp.watch([
         `${site.contentRoot}/**/*`,
@@ -206,5 +163,6 @@ function watch() {
 }
 
 // Build the site, run the server, and watch for file changes
+gulp.task('metalsmith', gulp.series(metalsmith, inlineSource));
 gulp.task('default', gulp.series('build', server, watch));
 gulp.task('app-watch', gulp.series('build', serverForApp, watch));
